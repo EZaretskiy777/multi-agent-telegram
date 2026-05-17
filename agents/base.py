@@ -122,6 +122,67 @@ AGENT_TOOLS = [
         "description": "Показать открытые Issues в репозитории активного проекта.",
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
+    # Workspace / code execution
+    {
+        "name": "write_file",
+        "description": (
+            "Создать или перезаписать файл в рабочей директории активного проекта на сервере. "
+            "Используй для записи кода, конфигов и других файлов."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path":    {"type": "string", "description": "Относительный путь к файлу (например: src/main.py)"},
+                "content": {"type": "string", "description": "Содержимое файла"},
+            },
+            "required": ["path", "content"],
+        },
+    },
+    {
+        "name": "read_workspace_file",
+        "description": "Прочитать файл из рабочей директории активного проекта на сервере.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string", "description": "Относительный путь к файлу"}
+            },
+            "required": ["path"],
+        },
+    },
+    {
+        "name": "list_workspace_files",
+        "description": "Показать структуру файлов в рабочей директории активного проекта на сервере.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "execute_bash",
+        "description": (
+            "Выполнить bash-команду в рабочей директории активного проекта на сервере. "
+            "Используй для установки зависимостей, запуска тестов, сборки проекта и т.д."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string", "description": "Shell-команда для выполнения"},
+                "timeout": {"type": "integer", "description": "Таймаут в секундах (по умолчанию 60, максимум 300)"},
+            },
+            "required": ["command"],
+        },
+    },
+    {
+        "name": "git_push",
+        "description": (
+            "Зафиксировать все изменения в рабочей директории и запушить в GitHub репозиторий проекта. "
+            "Выполняет git add -A, git commit, git push."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "message": {"type": "string", "description": "Сообщение коммита"}
+            },
+            "required": ["message"],
+        },
+    },
 ]
 
 
@@ -129,7 +190,7 @@ AGENT_TOOLS = [
 
 async def execute_tool(name: str, args: dict, chat_id: int = 0) -> str:
     from core.project import project_manager
-    from integrations import linear, notion, github
+    from integrations import linear, notion, github, executor
 
     project = project_manager.get_active(chat_id)
 
@@ -249,6 +310,50 @@ async def execute_tool(name: str, args: dict, chat_id: int = 0) -> str:
                 )
         except Exception as e:
             return f"Ошибка GitHub: {e}"
+
+    # ── Workspace / code execution ────────────────────────────────────────────
+    if name in ("write_file", "read_workspace_file", "list_workspace_files", "execute_bash", "git_push"):
+        if not project:
+            return "Нет активного проекта. Создай или переключись на проект перед выполнением команд."
+        pname = project.name
+
+        if name == "write_file":
+            return executor.write_file(pname, args["path"], args["content"])
+
+        if name == "read_workspace_file":
+            return executor.read_file(pname, args["path"])
+
+        if name == "list_workspace_files":
+            return executor.list_files(pname)
+
+        if name == "execute_bash":
+            timeout = min(int(args.get("timeout", 60)), 300)
+            cwd = executor.ensure_dir(pname)
+            return await executor.run(args["command"], cwd, timeout=timeout)
+
+        if name == "git_push":
+            from config import GITHUB_TOKEN
+            if not project.github_repo:
+                return "У активного проекта не задан GitHub репозиторий."
+            if not GITHUB_TOKEN:
+                return "GITHUB_TOKEN не задан в конфиге."
+            cwd = executor.ensure_dir(pname)
+            repo = project.github_repo
+            remote_url = f"https://{GITHUB_TOKEN}@github.com/{repo}.git"
+            cmds = [
+                "git init -b main 2>/dev/null || true",
+                f"git remote set-url origin {remote_url} 2>/dev/null || git remote add origin {remote_url}",
+                "git add -A",
+                f"git commit -m {repr(args['message'])}",
+                "git push -u origin main",
+            ]
+            output_parts = []
+            for cmd in cmds:
+                out = await executor.run(cmd, cwd, timeout=60)
+                output_parts.append(out)
+                if out.startswith("[exit") and "nothing to commit" not in out:
+                    break
+            return "\n".join(output_parts)
 
     return f"Неизвестный инструмент: {name}"
 
