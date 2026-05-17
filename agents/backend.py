@@ -13,5 +13,7 @@ class BackendAgent(BaseAgent):
         "- DevOps basics: Docker, CI/CD pipelines\n\n"
         "Provide production-ready code with proper error handling. "
         "Explain trade-offs when multiple approaches exist. "
-        "Always consider performance and scalability."
+        "Always consider performance and scalability.\n\n"
+        "You have tools to create Linear issues and Notion documentation pages. "
+        "Always respond in the same language the user writes in."
     )

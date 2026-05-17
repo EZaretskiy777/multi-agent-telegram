@@ -1,55 +1,71 @@
-from typing import Generator
 import anthropic
 from config import MODELS, MAX_TOKENS
+from .base import AGENT_TOOLS, execute_tool
 
 
 class AnalystAgent:
-    """
-    Analyst uses Opus with adaptive thinking for deep technical analysis.
-    Streaming is mandatory here — thinking + long output would timeout otherwise.
-    """
+    """Analyst: Opus 4.7 + adaptive thinking + tool use."""
 
     role = "analyst"
-    _system = [
-        {
-            "type": "text",
-            "text": (
-                "You are a senior technical analyst and solutions architect. You specialize in:\n"
-                "- Requirements analysis and PRD writing\n"
-                "- System design and architecture decisions\n"
-                "- Technical feasibility assessment\n"
-                "- Risk analysis and mitigation strategies\n"
-                "- API contracts and data modeling\n"
-                "- Technology stack evaluation and trade-off analysis\n\n"
-                "Think deeply before responding. Structure your analysis clearly with sections. "
-                "Consider long-term maintainability, scalability, and team capabilities. "
-                "Be decisive — provide clear recommendations, not just options."
-            ),
-            "cache_control": {"type": "ephemeral"},
-        }
-    ]
+    system_prompt = (
+        "You are a senior technical analyst and solutions architect. You specialize in:\n"
+        "- Requirements analysis and PRD writing\n"
+        "- System design and architecture decisions\n"
+        "- Technical feasibility assessment\n"
+        "- Risk analysis and mitigation strategies\n"
+        "- API contracts and data modeling\n"
+        "- Technology stack evaluation and trade-off analysis\n\n"
+        "Think deeply before responding. Structure your analysis clearly with sections. "
+        "Consider long-term maintainability, scalability, and team capabilities. "
+        "Be decisive — provide clear recommendations, not just options.\n\n"
+        "You have tools to create Linear issues and Notion documentation pages."
+    )
 
-    def __init__(self, client: anthropic.Anthropic):
+    def __init__(self, client: anthropic.AsyncAnthropic):
         self.client = client
         self.model = MODELS["analyst"]
         self.max_tokens = MAX_TOKENS["analyst"]
+        self._system = [
+            {
+                "type": "text",
+                "text": self.system_prompt,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
 
-    def stream(self, messages: list[dict]) -> Generator[str, None, None]:
-        with self.client.messages.stream(
-            model=self.model,
-            max_tokens=self.max_tokens,
-            thinking={"type": "adaptive"},
-            system=self._system,
-            messages=messages,
-        ) as s:
-            for event in s:
-                if (
-                    hasattr(event, "type")
-                    and event.type == "content_block_delta"
-                    and hasattr(event.delta, "type")
-                    and event.delta.type == "text_delta"
-                ):
-                    yield event.delta.text
+    @staticmethod
+    def _extract_text(content: list) -> str:
+        for block in content:
+            if hasattr(block, "type") and block.type == "text":
+                return block.text
+        return ""
 
-    def respond(self, messages: list[dict]) -> str:
-        return "".join(self.stream(messages))
+    async def respond(self, messages: list[dict]) -> str:
+        current = list(messages)
+
+        while True:
+            response = await self.client.messages.create(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                thinking={"type": "adaptive"},
+                system=self._system,
+                tools=AGENT_TOOLS,
+                messages=current,
+            )
+
+            if response.stop_reason == "tool_use":
+                tool_results = []
+                for block in response.content:
+                    if block.type == "tool_use":
+                        result = await execute_tool(block.name, block.input)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": result,
+                        })
+                current = current + [
+                    {"role": "assistant", "content": response.content},
+                    {"role": "user",      "content": tool_results},
+                ]
+            else:
+                return self._extract_text(response.content)

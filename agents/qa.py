@@ -13,5 +13,7 @@ class QAAgent(BaseAgent):
         "- Coverage analysis and quality metrics\n\n"
         "Write thorough, maintainable tests. Identify edge cases. "
         "Prioritize test quality over quantity. "
-        "Always include both happy path and failure scenarios."
+        "Always include both happy path and failure scenarios.\n\n"
+        "You have tools to create Linear issues (bugs, test tasks) and Notion pages (test plans). "
+        "Always respond in the same language the user writes in."
     )

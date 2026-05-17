@@ -1,21 +1,25 @@
+import os
 from enum import Enum
+from dotenv import load_dotenv
 
-# Model tiering — cheapest model that can handle each role
+load_dotenv()
+
 MODELS = {
-    "orchestrator": "claude-haiku-4-5",   # $1/1M — routing only
-    "backend":      "claude-sonnet-4-6",  # $3/1M — code generation
-    "frontend":     "claude-sonnet-4-6",  # $3/1M — UI/UX code
-    "qa":           "claude-sonnet-4-6",  # $3/1M — test writing
-    "analyst":      "claude-opus-4-7",    # $5/1M — complex analysis
+    "orchestrator": "claude-haiku-4-5",
+    "backend":      "claude-sonnet-4-6",
+    "frontend":     "claude-sonnet-4-6",
+    "qa":           "claude-sonnet-4-6",
+    "analyst":      "claude-opus-4-7",
 }
 
 MAX_TOKENS = {
-    "orchestrator": 512,    # Short routing decisions
+    "orchestrator": 1024,
     "backend":      8192,
     "frontend":     8192,
     "qa":           4096,
-    "analyst":      16000,  # Opus with thinking
+    "analyst":      16000,
 }
+
 
 class AgentRole(str, Enum):
     ORCHESTRATOR = "orchestrator"
@@ -23,3 +27,24 @@ class AgentRole(str, Enum):
     FRONTEND     = "frontend"
     QA           = "qa"
     ANALYST      = "analyst"
+
+
+ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
+
+TELEGRAM_TOKENS: dict[AgentRole, str] = {
+    AgentRole.ORCHESTRATOR: os.environ["TELEGRAM_TOKEN_ORCHESTRATOR"],
+    AgentRole.BACKEND:      os.environ["TELEGRAM_TOKEN_BACKEND"],
+    AgentRole.FRONTEND:     os.environ["TELEGRAM_TOKEN_FRONTEND"],
+    AgentRole.QA:           os.environ["TELEGRAM_TOKEN_QA"],
+    AgentRole.ANALYST:      os.environ["TELEGRAM_TOKEN_ANALYST"],
+}
+
+# Set after the group is created and bots are added
+GROUP_CHAT_ID: int = int(os.getenv("TELEGRAM_GROUP_CHAT_ID", "0"))
+
+LINEAR_API_KEY  = os.environ["LINEAR_API_KEY"]
+NOTION_API_KEY  = os.environ["NOTION_API_KEY"]
+NOTION_PARENT_PAGE_ID = os.environ["NOTION_PARENT_PAGE_ID"]
+
+# Daily standup time in HH:MM (24h, server local time)
+STANDUP_TIME = os.getenv("STANDUP_TIME", "09:00")
