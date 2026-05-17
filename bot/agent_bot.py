@@ -118,11 +118,23 @@ class AgentBot:
 
         await update.message.chat.send_action(ChatAction.TYPING)
 
-        self.sessions.add(chat_id, "user", user_text)
+        # Prepend active project context to the message
+        from core.project import project_manager
+        project = project_manager.get_active(chat_id)
+        if project:
+            ctx_line = f"[Проект: {project.name}"
+            if project.github_repo:
+                ctx_line += f" | GitHub: {project.github_repo}"
+            ctx_line += "]"
+            stored_text = f"{ctx_line}\n{user_text}"
+        else:
+            stored_text = user_text
+
+        self.sessions.add(chat_id, "user", stored_text)
         messages = self.sessions.get(chat_id)
 
         try:
-            reply = await self.agent.respond(messages)
+            reply = await self.agent.respond(messages, chat_id=chat_id)
         except Exception as e:
             reply = f"Ошибка: {e}"
 

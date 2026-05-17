@@ -23,8 +23,10 @@ async def run():
     client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
     bots = build_bots(client)
 
-    # Initialize all bots (fetch usernames, start polling)
-    await asyncio.gather(*[bot.initialize() for bot in bots])
+    # Initialize bots sequentially to avoid Telegram rate limits
+    for bot in bots:
+        await bot.initialize()
+        await asyncio.sleep(1)
 
     orchestrator_bot = bots[0]
     print("✅ All bots started:")

@@ -4,8 +4,6 @@ from .base import AGENT_TOOLS, execute_tool
 
 
 class AnalystAgent:
-    """Analyst: Opus 4.7 + adaptive thinking + tool use."""
-
     role = "analyst"
     system_prompt = (
         "You are a senior technical analyst and solutions architect. You specialize in:\n"
@@ -18,7 +16,8 @@ class AnalystAgent:
         "Think deeply before responding. Structure your analysis clearly with sections. "
         "Consider long-term maintainability, scalability, and team capabilities. "
         "Be decisive — provide clear recommendations, not just options.\n\n"
-        "You have tools to create Linear issues and Notion documentation pages."
+        "You have tools to manage projects, create Linear issues, Notion pages, and read GitHub repos. "
+        "Always respond in the same language the user writes in."
     )
 
     def __init__(self, client: anthropic.AsyncAnthropic):
@@ -40,9 +39,8 @@ class AnalystAgent:
                 return block.text
         return ""
 
-    async def respond(self, messages: list[dict]) -> str:
+    async def respond(self, messages: list[dict], chat_id: int = 0) -> str:
         current = list(messages)
-
         while True:
             response = await self.client.messages.create(
                 model=self.model,
@@ -52,12 +50,11 @@ class AnalystAgent:
                 tools=AGENT_TOOLS,
                 messages=current,
             )
-
             if response.stop_reason == "tool_use":
                 tool_results = []
                 for block in response.content:
                     if block.type == "tool_use":
-                        result = await execute_tool(block.name, block.input)
+                        result = await execute_tool(block.name, block.input, chat_id)
                         tool_results.append({
                             "type": "tool_result",
                             "tool_use_id": block.id,

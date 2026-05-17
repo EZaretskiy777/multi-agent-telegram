@@ -42,9 +42,11 @@ TELEGRAM_TOKENS: dict[AgentRole, str] = {
 # Set after the group is created and bots are added
 GROUP_CHAT_ID: int = int(os.getenv("TELEGRAM_GROUP_CHAT_ID", "0"))
 
-LINEAR_API_KEY  = os.environ["LINEAR_API_KEY"]
-NOTION_API_KEY  = os.environ["NOTION_API_KEY"]
+LINEAR_API_KEY        = os.environ["LINEAR_API_KEY"]
+NOTION_API_KEY        = os.environ["NOTION_API_KEY"]
 NOTION_PARENT_PAGE_ID = os.environ["NOTION_PARENT_PAGE_ID"]
+
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
 
 # Daily standup time in HH:MM (24h, server local time)
 STANDUP_TIME = os.getenv("STANDUP_TIME", "09:00")

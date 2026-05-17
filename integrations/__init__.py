@@ -1,3 +1,3 @@
-from . import linear, notion
+from . import linear, notion, github
 
-__all__ = ["linear", "notion"]
+__all__ = ["linear", "notion", "github"]

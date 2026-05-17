@@ -19,14 +19,30 @@ def _text_block(text: str) -> dict:
     }
 
 
-async def create_page(title: str, content: str) -> dict:
-    """Create a Notion page under the configured parent."""
-    # Split content into 2000-char chunks (Notion paragraph limit)
-    chunks = [content[i : i + 2000] for i in range(0, len(content), 2000)]
-    children = [_text_block(chunk) for chunk in chunks[:10]]  # max 10 blocks
-
+async def create_project_page(project_name: str) -> dict:
+    """Create a root documentation page for a new project."""
     body = {
         "parent": {"page_id": NOTION_PARENT_PAGE_ID},
+        "properties": {
+            "title": {"title": [{"text": {"content": f"📁 {project_name}"}}]}
+        },
+        "children": [_text_block(f"Документация проекта {project_name}")],
+    }
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(f"{BASE}/pages", headers=HEADERS, json=body)
+        r.raise_for_status()
+        data = r.json()
+        return {"id": data.get("id", ""), "url": data.get("url", "")}
+
+
+async def create_page(title: str, content: str, parent_id: str = "") -> dict:
+    """Create a documentation page. Uses project page as parent if provided."""
+    pid = parent_id or NOTION_PARENT_PAGE_ID
+    chunks = [content[i : i + 2000] for i in range(0, len(content), 2000)]
+    children = [_text_block(chunk) for chunk in chunks[:10]]
+
+    body = {
+        "parent": {"page_id": pid},
         "properties": {
             "title": {"title": [{"text": {"content": title}}]}
         },
