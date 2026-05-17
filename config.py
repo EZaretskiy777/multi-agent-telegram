@@ -47,6 +47,7 @@ NOTION_API_KEY        = os.environ["NOTION_API_KEY"]
 NOTION_PARENT_PAGE_ID = os.environ["NOTION_PARENT_PAGE_ID"]
 
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_OWNER = os.getenv("GITHUB_OWNER", "")  # default GitHub account for all projects
 
 # Daily standup time in HH:MM (24h, server local time)
 STANDUP_TIME = os.getenv("STANDUP_TIME", "09:00")

@@ -158,8 +158,13 @@ async def execute_tool(name: str, args: dict, chat_id: int = 0) -> str:
 
     # ── Project management ────────────────────────────────────────────────────
     if name == "create_project":
-        pname      = args["name"]
+        pname       = args["name"]
         github_repo = args.get("github_repo", "")
+        # If user gave just repo name without owner, prepend default owner
+        if github_repo and "/" not in github_repo:
+            from config import GITHUB_OWNER
+            if GITHUB_OWNER:
+                github_repo = f"{GITHUB_OWNER}/{github_repo}"
 
         linear_result = await linear.create_project(pname)
         notion_result = await notion.create_project_page(pname)
