@@ -1,4 +1,5 @@
 import asyncio
+import re
 import anthropic
 from telegram import Update, Bot
 from telegram.ext import (
@@ -29,6 +30,26 @@ CHUNK = 4000
 
 def _split(text: str) -> list[str]:
     return [text[i : i + CHUNK] for i in range(0, len(text), CHUNK)]
+
+
+def _md_to_html(text: str) -> str:
+    """Convert Claude's markdown to Telegram HTML."""
+    # Escape HTML special chars
+    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    # Fenced code blocks (``` ... ```)
+    text = re.sub(
+        r"```(?:\w+)?\n?(.*?)```",
+        lambda m: f"<pre><code>{m.group(1).rstrip()}</code></pre>",
+        text,
+        flags=re.DOTALL,
+    )
+    # Inline code
+    text = re.sub(r"`([^`\n]+)`", r"<code>\1</code>", text)
+    # Bold **text**
+    text = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text, flags=re.DOTALL)
+    # Italic *text* (only single asterisk, not inside words)
+    text = re.sub(r"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)", r"<i>\1</i>", text)
+    return text
 
 
 class AgentBot:
@@ -63,7 +84,7 @@ class AgentBot:
 
     async def _cmd_chatid(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
-            f"`{update.effective_chat.id}`", parse_mode="Markdown"
+            f"<code>{update.effective_chat.id}</code>", parse_mode="HTML"
         )
 
     async def _cmd_tasks(self, update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -107,8 +128,9 @@ class AgentBot:
 
         self.sessions.add(chat_id, "assistant", reply)
 
-        for chunk in _split(reply):
-            await update.message.reply_text(chunk)
+        html = _md_to_html(reply)
+        for chunk in _split(html):
+            await update.message.reply_text(chunk, parse_mode="HTML")
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -171,5 +193,6 @@ class AgentBot:
         """Push a message to the configured group chat."""
         if not GROUP_CHAT_ID:
             return
-        for chunk in _split(text):
-            await self.app.bot.send_message(chat_id=GROUP_CHAT_ID, text=chunk)
+        html = _md_to_html(text)
+        for chunk in _split(html):
+            await self.app.bot.send_message(chat_id=GROUP_CHAT_ID, text=chunk, parse_mode="HTML")
